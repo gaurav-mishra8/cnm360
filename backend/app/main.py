@@ -38,5 +38,5 @@ if os.path.isdir(STATIC_DIR):
     app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="assets")
 
     @app.get("/{full_path:path}")
-    def serve_frontend(_: str):
+    def serve_frontend(full_path: str = ""):
         return FileResponse(os.path.join(STATIC_DIR, "index.html"))
