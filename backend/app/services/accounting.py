@@ -245,6 +245,90 @@ def get_profit_loss(db: Session, org_id: str, from_date: date, to_date: date) ->
     )
 
 
+def get_cash_flow(db: Session, org_id: str, from_date: date, to_date: date) -> dict:
+    from app.models.accounting import Account, JournalLine, JournalEntry
+
+    cash_accounts = db.query(Account).filter(
+        Account.org_id == org_id,
+        Account.sub_type == "cash_and_bank",
+        Account.is_active == True,
+    ).all()
+    cash_ids = {a.id for a in cash_accounts}
+
+    opening = sum(a.opening_balance for a in cash_accounts)
+
+    entries = (
+        db.query(JournalEntry)
+        .filter(JournalEntry.org_id == org_id, JournalEntry.status == "posted",
+                JournalEntry.date >= from_date, JournalEntry.date <= to_date)
+        .all()
+    )
+
+    operating_in = operating_out = Decimal("0")
+    investing_in = investing_out = Decimal("0")
+    financing_in = financing_out = Decimal("0")
+    details = []
+
+    for entry in entries:
+        cash_lines = [l for l in entry.lines if l.account_id in cash_ids]
+        other_lines = [l for l in entry.lines if l.account_id not in cash_ids]
+        if not cash_lines:
+            continue
+
+        cash_debit = sum(l.debit for l in cash_lines)
+        cash_credit = sum(l.credit for l in cash_lines)
+        net = cash_debit - cash_credit  # positive = inflow
+
+        # Categorise by the other side of the entry
+        category = "operating"
+        for ol in other_lines:
+            acc = db.query(Account).filter(Account.id == ol.account_id).first()
+            if acc:
+                if acc.sub_type in ("fixed_asset",):
+                    category = "investing"
+                elif acc.sub_type in ("long_term_loan", "capital", "retained_earnings"):
+                    category = "financing"
+
+        if category == "operating":
+            if net >= 0:
+                operating_in += net
+            else:
+                operating_out += abs(net)
+        elif category == "investing":
+            if net >= 0:
+                investing_in += net
+            else:
+                investing_out += abs(net)
+        else:
+            if net >= 0:
+                financing_in += net
+            else:
+                financing_out += abs(net)
+
+        details.append({
+            "date": str(entry.date),
+            "entry_number": entry.entry_number,
+            "description": entry.description,
+            "inflow": float(max(net, Decimal("0"))),
+            "outflow": float(abs(min(net, Decimal("0")))),
+            "category": category,
+        })
+
+    closing = opening + operating_in - operating_out + investing_in - investing_out + financing_in - financing_out
+
+    return {
+        "from_date": str(from_date),
+        "to_date": str(to_date),
+        "opening_balance": float(opening),
+        "operating": {"inflow": float(operating_in), "outflow": float(operating_out), "net": float(operating_in - operating_out)},
+        "investing": {"inflow": float(investing_in), "outflow": float(investing_out), "net": float(investing_in - investing_out)},
+        "financing": {"inflow": float(financing_in), "outflow": float(financing_out), "net": float(financing_in - financing_out)},
+        "net_change": float(operating_in - operating_out + investing_in - investing_out + financing_in - financing_out),
+        "closing_balance": float(closing),
+        "details": sorted(details, key=lambda x: x["date"]),
+    }
+
+
 def get_balance_sheet(db: Session, org_id: str, as_of: date) -> BalanceSheetResponse:
     from datetime import date as date_type
     epoch = date_type(2000, 1, 1)

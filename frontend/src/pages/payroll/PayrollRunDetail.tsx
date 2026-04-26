@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Download } from 'lucide-react'
 import api from '@/services/api'
 import { PayrollRun, PayrollEntry } from '@/types'
 
@@ -38,6 +39,16 @@ export default function PayrollRunDetail() {
     mutationFn: () => api.post(`/payroll/runs/${runId}/approve`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['payroll-run', runId] }),
   })
+
+  async function downloadPayslip(entry: PayrollEntry) {
+    const res = await api.get(`/payroll/runs/${runId}/entries/${entry.id}/payslip`, { responseType: 'blob' })
+    const url = URL.createObjectURL(res.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Payslip_${entry.employee_code}_${run?.year}_${String(run?.month).padStart(2, '0')}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   if (isLoading) return <div className="p-6 text-slate-400">Loading…</div>
   if (!run) return <div className="p-6 text-red-500">Run not found</div>
@@ -103,6 +114,7 @@ export default function PayrollRunDetail() {
                 <th className="text-right px-4 py-3">TDS</th>
                 <th className="text-right px-4 py-3">Total Ded.</th>
                 <th className="text-right px-4 py-3 font-bold text-slate-700">Net Pay</th>
+                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
@@ -124,6 +136,12 @@ export default function PayrollRunDetail() {
                   <td className="px-4 py-3 text-right text-slate-600">₹{fmt(entry.tds)}</td>
                   <td className="px-4 py-3 text-right text-red-600">₹{fmt(entry.total_deductions)}</td>
                   <td className="px-4 py-3 text-right font-bold text-green-700">₹{fmt(entry.net_salary)}</td>
+                  <td className="px-4 py-3 text-center">
+                    <button onClick={() => downloadPayslip(entry)} title="Download Payslip"
+                      className="p-1.5 text-slate-400 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors">
+                      <Download size={14} />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -139,6 +157,7 @@ export default function PayrollRunDetail() {
                 <td className="px-4 py-3 text-right">₹{fmt(run.entries.reduce((s, e) => s + Number(e.tds), 0))}</td>
                 <td className="px-4 py-3 text-right text-red-600">₹{fmt(run.entries.reduce((s, e) => s + Number(e.total_deductions), 0))}</td>
                 <td className="px-4 py-3 text-right text-green-700">₹{fmt(run.total_net)}</td>
+                <td></td>
               </tr>
             </tfoot>
           </table>

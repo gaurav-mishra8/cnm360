@@ -11,6 +11,7 @@ from app.schemas.accounting import (
     TrialBalanceResponse, ProfitLossResponse, BalanceSheetResponse,
 )
 from app.services import accounting as svc
+from app.services.accounting import get_cash_flow
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
 
@@ -115,3 +116,9 @@ def profit_loss(from_date: date, to_date: date,
 @router.get("/reports/balance-sheet", response_model=BalanceSheetResponse)
 def balance_sheet(as_of: date, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return svc.get_balance_sheet(db, current_user.org_id, as_of)
+
+
+@router.get("/reports/cash-flow")
+def cash_flow(from_date: date, to_date: date,
+              current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return get_cash_flow(db, current_user.org_id, from_date, to_date)

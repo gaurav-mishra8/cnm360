@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -10,6 +11,7 @@ from app.schemas.payroll import (
     PayrollProcessRequest,
 )
 from app.services import payroll as svc
+from app.services.pdf import generate_payslip
 from decimal import Decimal
 
 router = APIRouter(prefix="/payroll", tags=["payroll"])
@@ -124,6 +126,21 @@ def process_run(run_id: str, req: PayrollProcessRequest,
         raise HTTPException(400, "Cannot reprocess an approved payroll run")
     run = svc.process_payroll_run(db, run, current_user.org_id, req)
     return _run_response(run)
+
+
+@router.get("/runs/{run_id}/entries/{entry_id}/payslip")
+def download_payslip(run_id: str, entry_id: str,
+                     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    run = svc.get_payroll_run(db, current_user.org_id, run_id)
+    if not run:
+        raise HTTPException(404, "Payroll run not found")
+    entry = next((e for e in run.entries if e.id == entry_id), None)
+    if not entry:
+        raise HTTPException(404, "Entry not found")
+    pdf_bytes = generate_payslip(current_user.organisation.name, entry, run.month, run.year)
+    filename = f"payslip-{entry.employee.employee_code}-{run.year}-{run.month:02d}.pdf"
+    return Response(content=pdf_bytes, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @router.post("/runs/{run_id}/approve", response_model=PayrollRunResponse)

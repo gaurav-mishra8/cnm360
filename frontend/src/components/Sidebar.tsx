@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   LayoutDashboard, BookOpen, FileText, BarChart3,
-  Users, Wallet, LogOut, Building2, ChevronDown
+  Users, Wallet, LogOut, Building2, ChevronDown, Receipt
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -68,6 +68,12 @@ export default function Sidebar() {
           </NavLink>
           <NavLink to="/payroll/runs" className={({ isActive }) => `${navItem} ${isActive ? active : inactive}`}>
             <Wallet size={16} /> Payroll Runs
+          </NavLink>
+        </NavGroup>
+
+        <NavGroup label="Invoices" icon={Receipt}>
+          <NavLink to="/invoices" className={({ isActive }) => `${navItem} ${isActive ? active : inactive}`}>
+            <Receipt size={16} /> All Invoices
           </NavLink>
         </NavGroup>
       </nav>

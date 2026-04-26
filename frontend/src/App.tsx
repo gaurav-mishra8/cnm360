@@ -13,6 +13,8 @@ import Employees from '@/pages/payroll/Employees'
 import NewEmployee from '@/pages/payroll/NewEmployee'
 import PayrollRuns from '@/pages/payroll/PayrollRuns'
 import PayrollRunDetail from '@/pages/payroll/PayrollRunDetail'
+import Invoices from '@/pages/invoices/Invoices'
+import NewInvoice from '@/pages/invoices/NewInvoice'
 
 export default function App() {
   return (
@@ -32,6 +34,8 @@ export default function App() {
             <Route path="payroll/employees/new" element={<NewEmployee />} />
             <Route path="payroll/runs" element={<PayrollRuns />} />
             <Route path="payroll/runs/:runId" element={<PayrollRunDetail />} />
+            <Route path="invoices" element={<Invoices />} />
+            <Route path="invoices/new" element={<NewInvoice />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

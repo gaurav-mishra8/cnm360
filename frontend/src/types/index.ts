@@ -107,3 +107,40 @@ export interface PayrollRun {
   total_net: number
   total_employer_cost: number
 }
+
+export interface InvoiceLineItem {
+  id?: string
+  description: string
+  hsn_sac_code: string | null
+  quantity: number
+  unit: string
+  rate: number
+  amount: number
+  gst_rate: number
+  cgst: number
+  sgst: number
+  igst: number
+  total: number
+}
+
+export interface Invoice {
+  id: string
+  invoice_number: string
+  date: string
+  due_date: string | null
+  customer_name: string
+  customer_gstin: string | null
+  customer_address: string | null
+  customer_email: string | null
+  place_of_supply: string | null
+  is_igst: boolean
+  subtotal: number
+  total_cgst: number
+  total_sgst: number
+  total_igst: number
+  total_amount: number
+  status: 'draft' | 'sent' | 'paid' | 'cancelled'
+  notes: string | null
+  created_at: string
+  line_items: InvoiceLineItem[]
+}

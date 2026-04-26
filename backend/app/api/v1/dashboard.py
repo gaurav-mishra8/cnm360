@@ -1,3 +1,4 @@
+import calendar as cal
 from datetime import date
 from decimal import Decimal
 from fastapi import APIRouter, Depends
@@ -13,6 +14,14 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _prev_month(year: int, month: int, n: int):
+    month -= n
+    while month <= 0:
+        month += 12
+        year -= 1
+    return year, month
 
 
 @router.get("/summary")
@@ -34,8 +43,25 @@ def summary(current_user: User = Depends(get_current_user), db: Session = Depend
 
     recent_entries = get_journal_entries(db, current_user.org_id, limit=5)
 
-    # Compliance calendar
-    compliance = _compliance_items(today)
+    # Monthly chart — last 6 months
+    monthly_chart = []
+    for i in range(5, -1, -1):
+        y, m = _prev_month(today.year, today.month, i)
+        from_d = date(y, m, 1)
+        to_d = date(y, m, cal.monthrange(y, m)[1])
+        pl = get_profit_loss(db, current_user.org_id, from_d, to_d)
+        monthly_chart.append({
+            "month": MONTHS[m - 1],
+            "revenue": float(pl.total_revenue),
+            "expenses": float(pl.total_expenses),
+            "profit": float(pl.net_profit),
+        })
+
+    # Expense breakdown by category (top 5)
+    expense_breakdown = []
+    for row in pl_fy.expenses:
+        expense_breakdown.append({"name": row.name, "value": float(row.amount)})
+    expense_breakdown = sorted(expense_breakdown, key=lambda x: x["value"], reverse=True)[:8]
 
     return {
         "fy": {
@@ -57,7 +83,9 @@ def summary(current_user: User = Depends(get_current_user), db: Session = Depend
             {"id": e.id, "entry_number": e.entry_number, "date": str(e.date),
              "description": e.description, "status": e.status} for e in recent_entries
         ],
-        "compliance": compliance,
+        "compliance": _compliance_items(today),
+        "monthly_chart": monthly_chart,
+        "expense_breakdown": expense_breakdown,
     }
 
 
@@ -65,14 +93,12 @@ def _compliance_items(today: date) -> list[dict]:
     items = []
     y, m = today.year, today.month
 
-    # GST monthly return — 20th of next month
     next_m = m + 1 if m < 12 else 1
     next_y = y if m < 12 else y + 1
     gst_due = date(next_y, next_m, 20)
     items.append({"name": f"GST GSTR-3B ({MONTHS[m - 1]})", "due": str(gst_due),
                   "days_left": (gst_due - today).days, "type": "gst"})
 
-    # TDS quarterly
     tds_quarters = [
         (4, 6, 7, 31, "Q1"), (7, 9, 10, 31, "Q2"), (10, 12, 1, 31, "Q3"), (1, 3, 5, 31, "Q4")
     ]
@@ -81,14 +107,12 @@ def _compliance_items(today: date) -> list[dict]:
         try:
             due = date(due_y, due_m, due_d)
         except ValueError:
-            import calendar
-            due = date(due_y, due_m, calendar.monthrange(due_y, due_m)[1])
+            due = date(due_y, due_m, cal.monthrange(due_y, due_m)[1])
         if due >= today:
             items.append({"name": f"TDS Return ({label})", "due": str(due),
                           "days_left": (due - today).days, "type": "tds"})
             break
 
-    # PF/ESIC monthly — 15th of next month
     pf_due = date(next_y, next_m, 15)
     items.append({"name": f"PF/ESIC Payment ({MONTHS[m - 1]})", "due": str(pf_due),
                   "days_left": (pf_due - today).days, "type": "pf"})
